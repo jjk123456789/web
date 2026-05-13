@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>알고리즘 시각화 도구 (폰트 및 UI 개선)</title>
+<!-- 세련된 한글 UI 폰트 (Pretendard) -->
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<!-- 깔끔한 코딩용 영문 폰트 (JetBrains Mono) -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; }
+  body { 
+    margin: 0; padding: 20px; 
+    background-color: #121212; /* 살짝 더 고급스러운 어두운 배경 */
+    color: #f1f3f5; 
+    /* 전체 UI 폰트 적용 */
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    display: flex; height: 100vh; gap: 20px;
+  }
+  
+  .panel {
+    flex: 1;
+    display: flex; flex-direction: column;
+    background: #1e1e1e; border-radius: 12px; padding: 25px; /* 모서리를 더 부드럽게 */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3); /* 은은한 그림자 추가 */
+  }
+
+  h2 {
+    margin-top: 0; margin-bottom: 20px;
+    font-weight: 700; color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  #visualizer-container {
+    flex: 1; display: flex; align-items: flex-end; gap: 2px;
+    border-bottom: 2px solid #444; margin-bottom: 20px;
+  }
+  .bar { 
+    flex: 1; background-color: #ced4da; 
+    border-radius: 2px 2px 0 0; /* 막대 윗부분을 둥글게 */
+    transition: background-color 0.02s; 
+  }
+  .bar.compare { background-color: #ff6b6b; }
+  .bar.swap { background-color: #20c997; }
+  .bar.pivot { background-color: #fcc419; }
+
+  .controls {
+    display: flex; flex-direction: column; gap: 15px;
+    background: #2b2b2b; padding: 18px; border-radius: 10px;
+  }
+  .control-row {
+    display: flex; align-items: center; gap: 15px; width: 100%;
+  }
+  .control-row > label { 
+    white-space: nowrap; font-weight: 500; color: #adb5bd; 
+  }
+  input[type="range"] { 
+    flex: 1; cursor: pointer; accent-color: #5c7cfa; 
+  }
+  
+  button {
+    padding: 12px 15px; cursor: pointer; font-family: inherit;
+    font-weight: 600; font-size: 14px; letter-spacing: -0.3px;
+    border: none; border-radius: 6px;
+    background: #4c6ef5; color: white; flex: 1;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button:hover:not(:disabled) { background: #364fc7; transform: translateY(-1px); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #495057; color: #868e96; cursor: not-allowed; }
+  #btn-stop { background: #fa5252; }
+  #btn-stop:hover:not(:disabled) { background: #e03131; }
+
+  /* 수도코드 컨테이너에만 코딩 폰트 적용 */
+  .code-container {
+    flex: 1; background: #141517; padding: 20px;
+    border-radius: 10px; overflow-y: auto; 
+    font-family: 'JetBrains Mono', Consolas, monospace; /* 코딩용 폰트 */
+    font-size: 15px; line-height: 1.7; margin-bottom: 20px;
+    color: #a9b7c6; border: 1px solid #333;
+  }
+  .code-line { 
+    padding: 2px 8px; border-radius: 4px; transition: background 0.05s, color 0.05s; 
+  }
+  .code-line.active { 
+    background: #3b5bdb; color: #fff; font-weight: 700; 
+  }
+  
+  .algo-buttons {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    background: #2b2b2b; padding: 18px; border-radius: 10px;
+  }
+  .algo-buttons button { background: #343a40; color: #dee2e6; }
+  .algo-buttons button:hover:not(:disabled) { background: #495057; }
+  .algo-buttons button.selected { background: #4c6ef5; color: white; }
+</style>
+</head>
+<body>
+
+  <div class="panel">
+    <h2>시각화 화면</h2>
+    <div id="visualizer-container"></div>
+    <div class="controls">
+      <div class="control-row">
+        <label for="size-slider">개수: <span id="size-val">40</span></label>
+        <input type="range" id="size-slider" min="10" max="150" value="40" oninput="updateSize()">
+        <label for="volume-slider">볼륨:</label>
+        <input type="range" id="volume-slider" min="0" max="0.5" step="0.01" value="0.05" oninput="updateVolume()">
+      </div>
+      <div class="control-row">
+        <button id="btn-shuffle" onclick="init()">배열 섞기</button>
+        <button id="btn-start" onclick="startSort()">정렬 시작</button>
+        <button id="btn-stop" onclick="stopSort()" disabled>정지</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>동작 로직</h2>
+    <div class="code-container" id="code-box"></div>
+    <div class="algo-buttons">
+      <button id="btn-quick" class="selected" onclick="setAlgo('quick')">Quick Sort</button>
+      <button id="btn-merge" onclick="setAlgo('merge')">Merge Sort</button>
+      <button id="btn-bubble" onclick="setAlgo('bubble')">Bubble Sort</button>
+    </div>
+  </div>
+
+  <script>
+    let arr = [];
+    let currentAlgo = 'quick';
+    let isSorting = false;
+    let isStopped = false;
+    
+    const container = document.getElementById('visualizer-container');
+    const sizeSlider = document.getElementById('size-slider');
+    const sizeVal = document.getElementById('size-val');
+    const volumeSlider = document.getElementById('volume-slider');
+    const codeBox = document.getElementById('code-box');
+
+    let audioCtx = null;
+    let gainNode = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        gainNode = audioCtx.createGain();
+        gainNode.connect(audioCtx.destination);
+        updateVolume();
+      }
+    }
+
+    function updateVolume() {
+      if (gainNode) {
+        gainNode.gain.setValueAtTime(parseFloat(volumeSlider.value), audioCtx.currentTime);
+      }
+    }
+
+    function playBeep(val) {
+      if (!audioCtx || volumeSlider.value == 0) return;
+      const osc = audioCtx.createOscillator();
+      const freq = 150 + (val / 420) * 800; 
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      osc.connect(gainNode);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    class StopSortException extends Error {}
+
+    const sleep = () => new Promise((resolve, reject) => {
+      if (isStopped) reject(new StopSortException());
+      setTimeout(() => {
+        if (isStopped) reject(new StopSortException());
+        else resolve();
+      }, Math.max(1, (200 - sizeSlider.value * 1.5) / 10));
+    });
+
+    const codes = {
+      quick: [
+        "quickSort(arr, start, end) {",
+        "  if (start >= end) return;",
+        "  pivot_idx = partition(arr, start, end);",
+        "  quickSort(arr, start, pivot_idx - 1);",
+        "  quickSort(arr, pivot_idx + 1, end);",
+        "}",
+        "partition(arr, start, end) {",
+        "  pivot = arr[end];",
+        "  i = start;",
+        "  for (j = start; j < end; j++) {",
+        "    if (arr[j] < pivot) {",
+        "      swap(arr[i], arr[j]);",
+        "      i++;",
+        "    }",
+        "  }",
+        "  swap(arr[i], arr[end]);",
+        "  return i;",
+        "}"
+      ],
+      merge: [
+        "mergeSort(arr, left, right) {",
+        "  if (left >= right) return;",
+        "  mid = floor((left + right) / 2);",
+        "  mergeSort(arr, left, mid);",
+        "  mergeSort(arr, mid + 1, right);",
+        "  merge(arr, left, mid, right);",
+        "}",
+        "merge(arr, left, mid, right) {",
+        "  temp = []; i = left; j = mid + 1;",
+        "  while (i <= mid && j <= right) {",
+        "    if (arr[i] <= arr[j]) temp.push(arr[i++]);",
+        "    else temp.push(arr[j++]);",
+        "  }",
+        "  while(i <= mid) temp.push(arr[i++]);",
+        "  while(j <= right) temp.push(arr[j++]);",
+        "  for (k = 0; k < temp.length; k++) {",
+        "    arr[left + k] = temp[k];",
+        "  }",
+        "}"
+      ],
+      bubble: [
+        "bubbleSort(arr) {",
+        "  n = arr.length;",
+        "  for (i = 0; i < n - 1; i++) {",
+        "    for (j = 0; j < n - i - 1; j++) {",
+        "      if (arr[j] > arr[j + 1]) {",
+        "        swap(arr[j], arr[j + 1]);",
+        "      }",
+        "    }",
+        "  }",
+        "}"
+      ]
+    };
+
+    function loadCode() {
+      codeBox.innerHTML = codes[currentAlgo].map((line, idx) => 
+        `<div id="line-${idx}" class="code-line">${line.replace(/ /g, '&nbsp;')}</div>`
+      ).join('');
+    }
+
+    function highlight(lineIdx) {
+      document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+      if (lineIdx !== -1 && document.getElementById(`line-${lineIdx}`)) {
+        document.getElementById(`line-${lineIdx}`).classList.add('active');
+      }
+    }
+
+    function updateSize() {
+      if (isSorting) return;
+      sizeVal.innerText = sizeSlider.value;
+      init();
+    }
+
+    function setAlgo(algo) {
+      if (isSorting) return;
+      currentAlgo = algo;
+      document.querySelectorAll('.algo-buttons button').forEach(btn => btn.classList.remove('selected'));
+      document.getElementById(`btn-${algo}`).classList.add('selected');
+      loadCode();
+      init();
+    }
+
+    function init() {
+      if (isSorting) return;
+      const size = parseInt(sizeSlider.value);
+      arr = Array.from({length: size}, () => Math.floor(Math.random() * 400) + 20);
+      draw();
+      highlight(-1);
+    }
+
+    function draw() {
+      container.innerHTML = '';
+      arr.forEach(val => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = (val / 420 * 100) + '%';
+        container.appendChild(bar);
+      });
+    }
+
+    function toggleButtons(sorting) {
+      isSorting = sorting;
+      document.getElementById('btn-start').disabled = sorting;
+      document.getElementById('btn-shuffle').disabled = sorting;
+      document.getElementById('btn-stop').disabled = !sorting;
+      sizeSlider.disabled = sorting;
+      
+      document.querySelectorAll('.algo-buttons button').forEach(btn => {
+        btn.disabled = sorting;
+      });
+    }
+
+    function stopSort() {
+      isStopped = true;
+    }
+
+    async function startSort() {
+      if (isSorting) return;
+      initAudio(); 
+      
+      isStopped = false;
+      toggleButtons(true);
+      
+      try {
+        if (currentAlgo === 'quick') {
+          await quickSort(0, arr.length - 1);
+        } else if (currentAlgo === 'merge') {
+          await mergeSortProcess(0, arr.length - 1);
+        } else if (currentAlgo === 'bubble') {
+          await bubbleSort();
+        }
+
+        highlight(-1);
+        const bars = container.children;
+        for(let i=0; i<bars.length; i++) bars[i].style.backgroundColor = '#20c997'; // 완료 시 더 예쁜 초록색
+      } catch (e) {
+        if (e instanceof StopSortException) {
+          highlight(-1);
+        } else {
+          console.error(e);
+        }
+      } finally {
+        toggleButtons(false);
+      }
+    }
+
+    /* --- 퀵 정렬 --- */
+    async function quickSort(start, end) {
+      highlight(1); await sleep();
+      if (start >= end) return;
+      
+      highlight(2); await sleep();
+      let pivotIdx = await partition(start, end);
+      
+      highlight(3); await sleep();
+      await quickSort(start, pivotIdx - 1);
+      
+      highlight(4); await sleep();
+      await quickSort(pivotIdx + 1, end);
+    }
+
+    async function partition(start, end) {
+      const bars = container.children;
+      let pivotValue = arr[end];
+      let pivotIndex = start;
+      
+      bars[end].classList.add('pivot');
+      highlight(7); await sleep();
+      highlight(8); await sleep();
+
+      for (let i = start; i < end; i++) {
+        highlight(9);
+        bars[i].classList.add('compare');
+        await sleep();
+
+        highlight(10); await sleep();
+        if (arr[i] < pivotValue) {
+          highlight(11);
+          await doSwap(i, pivotIndex);
+          highlight(12); await sleep();
+          pivotIndex++;
+        }
+        bars[i].classList.remove('compare');
+      }
+      highlight(15);
+      await doSwap(pivotIndex, end);
+      bars[pivotIndex].classList.remove('pivot');
+      
+      highlight(16); await sleep();
+      return pivotIndex;
+    }
+
+    /* --- 합병 정렬 --- */
+    async function mergeSortProcess(left, right) {
+      highlight(1); await sleep();
+      if (left >= right) return;
+      
+      highlight(2); await sleep();
+      let mid = Math.floor((left + right) / 2);
+      
+      highlight(3); await sleep();
+      await mergeSortProcess(left, mid);
+      
+      highlight(4); await sleep();
+      await mergeSortProcess(mid + 1, right);
+      
+      highlight(5); await sleep();
+      await doMerge(left, mid, right);
+    }
+
+    async function doMerge(left, mid, right) {
+      highlight(8); await sleep();
+      let temp = [];
+      let i = left, j = mid + 1;
+      const bars = container.children;
+
+      highlight(9); await sleep();
+      while (i <= mid && j <= right) {
+        bars[i].classList.add('compare');
+        bars[j].classList.add('compare');
+        await sleep();
+        
+        highlight(10); await sleep();
+        if (arr[i] <= arr[j]) {
+          temp.push(arr[i++]);
+        } else {
+          highlight(11); await sleep();
+          temp.push(arr[j++]);
+        }
+        
+        if(i-1 >= left) bars[i-1].classList.remove('compare');
+        if(j-1 >= mid+1) bars[j-1].classList.remove('compare');
+      }
+
+      highlight(13); await sleep();
+      while (i <= mid) temp.push(arr[i++]);
+      highlight(14); await sleep();
+      while (j <= right) temp.push(arr[j++]);
+
+      highlight(15); await sleep();
+      for (let k = 0; k < temp.length; k++) {
+        highlight(16);
+        bars[left + k].classList.add('swap');
+        arr[left + k] = temp[k];
+        
+        playBeep(arr[left + k]);
+        bars[left + k].style.height = (arr[left + k] / 420 * 100) + '%';
+        
+        await sleep();
+        bars[left + k].classList.remove('swap');
+      }
+    }
+
+    /* --- 버블 정렬 --- */
+    async function bubbleSort() {
+      const n = arr.length;
+      const bars = container.children;
+      highlight(1); await sleep();
+
+      for (let i = 0; i < n - 1; i++) {
+        highlight(2); await sleep();
+        for (let j = 0; j < n - i - 1; j++) {
+          highlight(3);
+          bars[j].classList.add('compare');
+          bars[j+1].classList.add('compare');
+          await sleep();
+
+          highlight(4); await sleep();
+          if (arr[j] > arr[j + 1]) {
+            highlight(5);
+            await doSwap(j, j + 1);
+          }
+          bars[j].classList.remove('compare');
+          bars[j+1].classList.remove('compare');
+        }
+      }
+    }
+
+    async function doSwap(i, j) {
+      const bars = container.children;
+      bars[i].classList.add('swap');
+      bars[j].classList.add('swap');
+      
+      let temp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = temp;
+
+      playBeep(arr[i]);
+      
+      bars[i].style.height = (arr[i] / 420 * 100) + '%';
+      bars[j].style.height = (arr[j] / 420 * 100) + '%';
+
+      await sleep();
+      bars[i].classList.remove('swap');
+      bars[j].classList.remove('swap');
+    }
+
+    loadCode();
+    init();
+  </script>
+</body>
+</html>
